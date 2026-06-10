@@ -1,6 +1,6 @@
 # Local AI Deployment Guide with Ollama, Docker, and Tailscale
 
-![Skills](https://skillicons.dev/icons?i=docker,ollama,openwebui,tailscale,linux,bash,yaml&theme=dark)
+![Skills](https://skillicons.dev/icons?i=docker,linux,bash,yaml&theme=dark)
 
 This repository contains the configuration needed to deploy a private, secure Artificial Intelligence environment accessible from anywhere without opening ports on your router.
 
