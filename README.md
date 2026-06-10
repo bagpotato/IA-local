@@ -1,73 +1,75 @@
-# Guía de Despliegue de IA Local con Ollama, Docker y Tailscale
+# Local AI Deployment Guide with Ollama, Docker, and Tailscale
 
-Este repositorio contiene la configuración necesaria para desplegar un entorno de Inteligencia Artificial privado, seguro y accesible desde cualquier lugar sin necesidad de abrir puertos en su router.
+![Skills](https://skillicons.dev/icons?i=docker,ollama,openwebui,tailscale,linux,bash,yaml&theme=dark)
 
-## Tabla de Contenidos
-1. [Requisitos Previos](#requisitos-previos)
-2. [Instalación de Docker](#1-instalación-de-docker)
-3. [Instalación de Ollama](#2-instalación-de-ollama)
-4. [Interfaz Web con Docker](#3-interfaz-web-con-docker)
-5. [Acceso Remoto con Tailscale (Crítico)](#4-acceso-remoto-con-tailscale-crítico)
-6. [Uso y Comandos Útiles](#5-uso-y-comandos-útiles)
+This repository contains the configuration needed to deploy a private, secure Artificial Intelligence environment accessible from anywhere without opening ports on your router.
 
----
-
-## Requisitos Previos
-* **Sistema Operativo:** Linux (Ubuntu recomendado), Windows (WSL2) o macOS.
-* **Hardware:** Mínimo 8GB de RAM (16GB o más recomendado para modelos de 7B o superiores).
-* **GPU (Opcional):** NVIDIA con drivers actualizados para aceleración por hardware.
+## Table of Contents
+1. [Prerequisites](#prerequisites)
+2. [Installing Docker](#1-installing-docker)
+3. [Installing Ollama](#2-installing-ollama)
+4. [Web Interface with Docker](#3-web-interface-with-docker)
+5. [Remote Access with Tailscale (Critical)](#4-remote-access-with-tailscale-critical)
+6. [Usage and Useful Commands](#5-usage-and-useful-commands)
 
 ---
 
-## 1. Instalación de Docker
-Docker es fundamental para aislar los servicios y facilitar la actualización de la interfaz web y otros componentes del sistema.
+## Prerequisites
+* **Operating System:** Linux (Ubuntu recommended), Windows (WSL2) or macOS.
+* **Hardware:** Minimum 8GB of RAM (16GB or more recommended for 7B+ models).
+* **GPU (Optional):** NVIDIA with up-to-date drivers for hardware acceleration.
 
-### En Linux (Ubuntu/Debian)
+---
+
+## 1. Installing Docker
+Docker is essential to isolate the services and to simplify updating the web interface and other system components.
+
+### On Linux (Ubuntu/Debian)
 ```bash
-# Actualizar sistema e instalar dependencias
+# Update system and install dependencies
 sudo apt update && sudo apt upgrade -y
 sudo apt install ca-certificates curl gnupg lsb-release
 
-# Añadir llave oficial de Docker
+# Add Docker's official GPG key
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-# Configurar repositorio oficial
+# Set up the official repository
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# Instalar Docker Engine y Compose
+# Install Docker Engine and Compose
 sudo apt update
 sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Permitir uso sin privilegios de root (Opcional)
+# Allow running without root (Optional)
 sudo usermod -aG docker $USER
 ```
 
 ---
 
-## 2. Instalación de Ollama
-Ollama es el motor que ejecuta los modelos de lenguaje (LLMs) de forma eficiente en el servidor local.
+## 2. Installing Ollama
+Ollama is the engine that runs large language models (LLMs) efficiently on the local server.
 
-### Instalación Directa
+### Direct Installation
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-### Configuración de Red para Ollama
-Para que Ollama acepte conexiones externas (indispensable para la interfaz web en Docker y acceso remoto), se debe editar el servicio:
+### Network Configuration for Ollama
+For Ollama to accept external connections (required for the Docker web interface and remote access), edit the service:
 
-1. Ejecutar: `sudo systemctl edit ollama.service`
-2. Insertar el siguiente contenido:
+1. Run: `sudo systemctl edit ollama.service`
+2. Insert the following content:
    ```ini
    [Service]
    Environment="OLLAMA_HOST=0.0.0.0"
    Environment="OLLAMA_ORIGINS=*"
    ```
-3. Reiniciar el servicio para aplicar cambios:
+3. Restart the service to apply the changes:
    ```bash
    sudo systemctl daemon-reload
    sudo systemctl restart ollama
@@ -75,10 +77,10 @@ Para que Ollama acepte conexiones externas (indispensable para la interfaz web e
 
 ---
 
-## 3. Interfaz Web con Docker
-Utilizaremos **Open WebUI** para obtener una experiencia de usuario optimizada, similar a plataformas comerciales pero con ejecución 100% local.
+## 3. Web Interface with Docker
+We will use **Open WebUI** to get an optimized user experience, similar to commercial platforms but with 100% local execution.
 
-Cree un archivo `docker-compose.yaml` en la raíz de este proyecto:
+Create a `docker-compose.yaml` file at the root of this project:
 
 ```yaml
 services:
@@ -99,51 +101,49 @@ volumes:
   open-webui:
 ```
 
-Para iniciar el contenedor, ejecute: `docker compose up -d`
+To start the container, run: `docker compose up -d`
 
 ---
 
-## 4. Acceso Remoto con Tailscale (Crítico)
-Tailscale es la pieza clave para la seguridad y portabilidad del proyecto. Crea una red privada virtual (VPN Mesh) que permite acceder al servidor desde cualquier lugar sin exponer el equipo a internet.
+## 4. Remote Access with Tailscale (Critical)
+Tailscale is the key piece for the project's security and portability. It creates a private virtual network (Mesh VPN) that allows accessing the server from anywhere without exposing the machine to the internet.
 
-### Ventajas de implementar Tailscale
-* **Seguridad:** No requiere la apertura de puertos en el router (Port Forwarding), eliminando vectores de ataque externos.
-* **IP Estática Interna:** El servidor recibe una IP fija dentro de la red privada (ej. 100.x.y.z) que no cambia aunque se mueva de ubicación física.
-* **Cifrado E2E:** Todo el tráfico entre sus dispositivos está cifrado de extremo a extremo.
+### Benefits of Tailscale
+* **Security:** No need to open ports on the router (Port Forwarding), eliminating external attack vectors.
+* **Static Internal IP:** The server receives a fixed IP inside the private network (e.g. 100.x.y.z) that does not change even when moving the machine physically.
+* **E2E Encryption:** All traffic between your devices is end-to-end encrypted.
 
-### Configuración:
-1. **Instalación en el servidor:**
+### Setup:
+1. **Install on the server:**
    ```bash
    curl -fsSL https://tailscale.com/install.sh | sh
    sudo tailscale up
    ```
-2. **Obtención de la IP privada:**
-   Ejecute `tailscale ip -4`. Use esta dirección para conectarse desde otros dispositivos.
-3. **Acceso remoto:**
-   Instale Tailscale en su dispositivo móvil o laptop. Una vez activo, podrá acceder a la interfaz web mediante:
-   `http://[IP-DE-TAILSCALE]:3000`
+2. **Get the private IP:**
+   Run `tailscale ip -4`. Use this address to connect from other devices.
+3. **Remote access:**
+   Install Tailscale on your mobile device or laptop. Once active, you can access the web interface via:
+   `http://[TAILSCALE-IP]:3000`
 
 ---
 
-## 5. Uso y Comandos Útiles
+## 5. Usage and Useful Commands
 
-### Gestión de Modelos
-Es necesario descargar los modelos manualmente antes de su primer uso:
+### Model Management
+Models must be downloaded manually before first use:
 ```bash
-ollama pull llama3       # Modelo equilibrado de Meta
-ollama pull mistral (no usado en el repositorio)     # Optimizado para eficiencia
-ollama pull llava (no usado en el repositorio)       # Modelo multimodal (soporta imágenes)
+ollama pull llama3       # Balanced model from Meta
+ollama pull mistral (not used in the repo)     # Optimized for efficiency
+ollama pull llava (not used in the repo)       # Multimodal model (supports images)
 ```
 
-### Mantenimiento de la Interfaz
-* **Ver registros de actividad:** `docker logs -f open-webui`
-* **Actualizar a la última versión:**
+### Interface Maintenance
+* **View activity logs:** `docker logs -f open-webui`
+* **Update to the latest version:**
   ```bash
   docker compose pull
   docker compose up -d
   ```
 
-### Diagnóstico de Red
-Para confirmar que el acceso remoto es funcional, verifique que puede realizar un ping a la IP de Tailscale desde un dispositivo externo conectado a la misma cuenta de Tailscale.
-
----
+### Network Diagnostics
+To confirm remote access is working, verify that you can ping the Tailscale IP from an external device connected to the same Tailscale account.
