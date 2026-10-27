@@ -30,7 +30,7 @@ class ToolSpec:
     description: str
     args_model: type[BaseModel]
     func: Callable[[Ctx, Any], str]
-    group: str  # web | files | code | screen | memory
+    group: str  # web | files | code | screen | memory | agents
     role: str = "executor"  # research | vision | executor (CrewAI)
     dangerous: bool = False
     taints: bool = False
@@ -42,14 +42,15 @@ GROUP_FLAGS = {
     "code": "enable_code",
     "screen": "enable_screen",
     "memory": "enable_memory",
+    "agents": "enable_subagents",
 }
 
 
 def all_tools() -> dict[str, ToolSpec]:
-    from agent.tools import code, memory, system, vision, web
+    from agent.tools import agents, code, memory, system, vision, web
 
     out: dict[str, ToolSpec] = {}
-    for module in (web, system, vision, code, memory):
+    for module in (web, system, vision, code, memory, agents):
         for spec in module.SPECS:
             out[spec.name] = spec
     return out

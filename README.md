@@ -119,6 +119,7 @@ opencode                     # https://opencode.ai
 ```
 
 * `install.sh` creates `.env` with a random `AGENT_API_KEY` and does not print it. The whole API requires it except `/health`.
+* Subagents: the `delegate` tool splits independent tasks across parallel sub-agents (safe tools only), and safe tool calls in one step run concurrently. Tune with `SUBAGENT_*` in `.env` (see docs/AGENT.md).
 * Engines: `AGENT_ENGINE=native` (default) or `crewai` (`pip install -r requirements-crewai.txt`).
 * Tools: web (`web_search`, `web_news`, `fetch_page`, `web_research`), files, `run_python` sandbox, screen/webcam, memory. Dangerous tools are locked after touching untrusted web content in the same turn (`TAINT_LOCK`).
 

@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     enable_screen: bool = Field(False, alias="ENABLE_SCREEN")
     taint_lock: bool = Field(True, alias="TAINT_LOCK")
 
+    # Subagentes
+    enable_subagents: bool = Field(True, alias="ENABLE_SUBAGENTS")
+    max_subagents: int = Field(4, alias="MAX_SUBAGENTS", ge=1, le=8)
+    subagent_iterations: int = Field(4, alias="SUBAGENT_ITERATIONS", ge=1, le=10)
+    subagent_concurrency: int = Field(2, alias="SUBAGENT_CONCURRENCY", ge=1, le=8)
+
     # Web
     page_chars: int = Field(4000, alias="PAGE_CHARS", ge=500, le=20000)
 

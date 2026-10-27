@@ -64,10 +64,20 @@ Modelos: no hay ninguno por defecto. `install.sh` te pregunta `LLM_MODEL` (oblig
 | Código (`ENABLE_CODE`) | `run_python`* |
 | Pantalla/webcam (`ENABLE_SCREEN`) | `look_at_screen`, `look_through_webcam` |
 | Memoria (`ENABLE_MEMORY`) | `remember`*, `recall` |
+| Subagentes (`ENABLE_SUBAGENTS`) | `delegate` |
 
 \* peligrosas: se bloquean tras tocar contenido web o de pantalla en el mismo turno (`TAINT_LOCK=true`). Si el agente lo menciona, repite la orden en un mensaje nuevo.
 
 Límites: el workspace es `~/ia-workspace`; `run_command` solo admite `ls pwd cat head tail wc grep uniq date df du uname stat file`, sin shell ni rutas fuera del workspace; `run_python` usa un contenedor sin red, de solo lectura y sin montajes.
+
+## Subagentes y paralelismo
+
+Para ir más rápido y con menos ruido en el contexto principal (solo motor `native`):
+
+- **`delegate`**: el agente reparte 2 o más tareas independientes (investigar varios temas, comparar opciones...) entre subagentes que corren en paralelo y recibe un resultado breve de cada uno. Cada subagente tiene su propio contexto, un máximo de `SUBAGENT_ITERATIONS` pasos y solo herramientas no peligrosas (sin `write_file`, `run_command`, `run_python`, `remember`) y sin poder delegar. Si un subagente lee web o pantalla, el taint lock se aplica también al agente principal. Sus resultados llegan como `<subagent_result untrusted>`.
+- **Herramientas en paralelo**: si el modelo pide varias herramientas en un mismo paso, las no peligrosas se ejecutan a la vez; las peligrosas, después y una a una.
+
+Ajustes en `.env`: `ENABLE_SUBAGENTS`, `MAX_SUBAGENTS` (tareas por llamada), `SUBAGENT_ITERATIONS`, `SUBAGENT_CONCURRENCY`. Los subagentes comparten el mismo Ollama: la ganancia de velocidad real depende de `OLLAMA_NUM_PARALLEL` y de la memoria disponible; con 1 solo hueco se ejecutan por turnos y se gana sobre todo en contexto limpio. CrewAI no usa `delegate`.
 
 ## Conexión con opencode
 

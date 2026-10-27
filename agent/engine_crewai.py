@@ -127,6 +127,7 @@ async def run_crewai(
     specs: list[ToolSpec] | None = None,
 ) -> AsyncIterator[Event]:
     specs = enabled_tools(settings) if specs is None else specs
+    specs = [s for s in specs if s.group != "agents"]
     available = {s.role for s in specs}
     roles = await route(settings, messages, available) if available else []
 

@@ -79,6 +79,13 @@ def build_system_prompt(tool_names: set[str], extra: str = "", now: datetime | N
         parts.append("Herramientas disponibles: " + ", ".join(sorted(tool_names)) + ".")
     if "recall" in tool_names:
         parts.append("Usa recall cuando el usuario se refiera a algo que le hayas guardado antes.")
+    if "delegate" in tool_names:
+        parts.append(
+            "Usa delegate cuando la petición se divida en 2 o más partes independientes (por ejemplo, investigar "
+            "varios temas o comparar opciones): los subagentes trabajan en paralelo y es más rápido. Escribe cada "
+            "tarea completa y autocontenida. Después, contrasta y resume tú los resultados. No delegues preguntas "
+            "simples ni pasos que dependan del anterior."
+        )
     if extra.strip():
         parts.append("Instrucciones adicionales del cliente:\n" + extra.strip())
     return "\n\n".join(parts)
