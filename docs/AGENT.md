@@ -90,9 +90,9 @@ opencode
 
 Los estados de herramienta aparecen como líneas en cursiva dentro de la respuesta.
 
-## Red, firewall y Tailscale
+## Red
 
-- El agente escucha por defecto en `127.0.0.1:8000` (`AGENT_HOST`). Para usarlo desde otros dispositivos, pon `AGENT_HOST` con la IP de Tailscale (`tailscale ip -4`) y no abras el 8000 a la LAN.
+- El agente escucha por defecto en `127.0.0.1:8000` (`AGENT_HOST`). No lo expongas a la LAN sin necesidad.
 - Toda la API exige `AGENT_API_KEY` (cabecera `Authorization: Bearer …` o `X-API-Key`); solo `/health` es público. Sin clave, el servidor no arranca.
 
 ## Acceso a internet
