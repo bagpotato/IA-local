@@ -1,27 +1,54 @@
-# Local AI Deployment Guide with Ollama, Docker, and Tailscale
+# IA-local
 
-![Skills](https://skillicons.dev/icons?i=docker,linux,bash,yaml&theme=dark)
+![Skills](https://skillicons.dev/icons?i=docker,linux,bash,python,fastapi&theme=dark)
 
-This repository contains the configuration needed to deploy a private, secure Artificial Intelligence environment accessible from anywhere without opening ports on your router.
+Private, local AI environment: **Ollama** runs the models, **Open WebUI** is the chat interface, and a **local multimodal agent** (FastAPI, OpenAI-compatible API) adds web research, file tools, a Docker code sandbox, memory (Qdrant), screen/webcam vision and voice. Remote access goes through **Tailscale**, with no open ports on your router.
+
+```
+Open WebUI (Docker) --> http://host.docker.internal:8000/v1 --> agent (host) --> Ollama
+                                                                  |- Qdrant (Docker, 127.0.0.1:6333)
+                                                                  `- sandbox: docker run --rm --network none ...
+```
+
+Full agent documentation (modes, tools, security, endpoints): [docs/AGENT.md](docs/AGENT.md)
 
 ## Table of Contents
-1. [Prerequisites](#prerequisites)
-2. [Installing Docker](#1-installing-docker)
-3. [Installing Ollama](#2-installing-ollama)
-4. [Web Interface with Docker](#3-web-interface-with-docker)
-5. [Remote Access with Tailscale (Critical)](#4-remote-access-with-tailscale-critical)
-6. [Usage and Useful Commands](#5-usage-and-useful-commands)
-
----
+1. [Repository layout](#1-repository-layout)
+2. [Installing Docker](#2-installing-docker)
+3. [Installing Ollama](#3-installing-ollama)
+4. [Basic stack: Ollama + Open WebUI](#4-basic-stack-ollama--open-webui)
+5. [Local agent](#5-local-agent)
+6. [Tests](#6-tests)
+7. [Models](#7-models)
+8. [Remote Access with Tailscale](#8-remote-access-with-tailscale-critical)
+9. [Useful commands](#9-useful-commands)
 
 ## Prerequisites
-* **Operating System:** Linux (Ubuntu recommended), Windows (WSL2) or macOS.
-* **Hardware:** Minimum 8GB of RAM (16GB or more recommended for 7B+ models).
-* **GPU (Optional):** NVIDIA with up-to-date drivers for hardware acceleration.
+* **OS:** Linux (Ubuntu recommended), Windows (WSL2) or macOS.
+* **Hardware:** 8 GB RAM minimum (16 GB or more for 7B+ models).
+* **GPU (optional):** NVIDIA with up-to-date drivers.
+* **Agent:** Python 3.11+, Docker, Ollama.
 
 ---
 
-## 1. Installing Docker
+## 1. Repository layout
+
+| Path | Description |
+|---|---|
+| `docker-compose.yml` | Basic stack: Ollama + Open WebUI (data in `ollama_data/` and `webui_data/`) |
+| `docker-compose.override.yml` | Points Open WebUI at the agent and adds Qdrant. Requires `AGENT_API_KEY` in `.env` |
+| `instalar.sh` | Starts the basic stack and pulls the small models (`qwen2.5-coder:1.5b`, Gemma-3-1B) into the Ollama container |
+| `coder_shell.py` | Minimal CLI that queries `qwen2.5-coder:1.5b` on `localhost:11434` (needs `requests`) |
+| `agent/` | The agent: engines (native / CrewAI), tools, security, storage and tests |
+| `scripts/install.sh`, `scripts/run.sh` | Install and run the agent (venv, models, sandbox image, Piper voice, `.env`) |
+| `.env.example` | Agent configuration template |
+| `docs/AGENT.md` | Detailed agent documentation (in Spanish) |
+
+> `docker-compose.override.yml` is loaded automatically by `docker compose up -d`. Without `AGENT_API_KEY` defined in `.env`, the command fails. Run `bash scripts/install.sh` first (it generates the key), or run only the basic stack with `docker compose -f docker-compose.yml up -d`.
+
+---
+
+## 2. Installing Docker
 Docker is essential to isolate the services and to simplify updating the web interface and other system components.
 
 ### On Linux (Ubuntu/Debian)
@@ -51,7 +78,7 @@ sudo usermod -aG docker $USER
 
 ---
 
-## 2. Installing Ollama
+## 3. Installing Ollama
 Ollama is the engine that runs large language models (LLMs) efficiently on the local server.
 
 ### Direct Installation
@@ -77,35 +104,63 @@ For Ollama to accept external connections (required for the Docker web interface
 
 ---
 
-## 3. Web Interface with Docker
-We will use **Open WebUI** to get an optimized user experience, similar to commercial platforms but with 100% local execution.
+## 4. Basic stack: Ollama + Open WebUI
+`docker-compose.yml` starts Ollama and **Open WebUI** (100% local, similar to commercial chat UIs):
 
-Create a `docker-compose.yaml` file at the root of this project:
-
-```yaml
-services:
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
-    restart: always
-    ports:
-      - "3000:8080"
-    environment:
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - open-webui:/app/backend/data
-
-volumes:
-  open-webui:
+```bash
+docker compose -f docker-compose.yml up -d
+bash instalar.sh        # optional: pulls the small models
 ```
 
-To start the container, run: `docker compose up -d`
+Open WebUI is served on `http://localhost:3000`. Update it with `docker compose pull && docker compose up -d`.
+
+> The Ollama container publishes `11434` on all interfaces. Limit it with your firewall or bind it to `127.0.0.1:11434:11434` if you do not need LAN access.
 
 ---
 
-## 4. Remote Access with Tailscale (Critical)
+## 5. Local agent
+The agent runs on the host (Python venv) next to Ollama and exposes an OpenAI-compatible API on port `8000` that Open WebUI consumes (model **ia-agent**).
+
+```bash
+bash scripts/install.sh      # venv, dependencies, Ollama models, sandbox image, Piper voice, .env
+docker compose up -d         # Open WebUI + Qdrant (reads docker-compose.yml and the override)
+bash scripts/run.sh          # starts the agent on :8000
+```
+
+* `install.sh` creates `.env` with a random `AGENT_API_KEY` and does not print it. The whole API requires it except `/health`.
+* Engines: `AGENT_ENGINE=native` (default) or `crewai` (`pip install -r requirements-crewai.txt`).
+* Tools: web (`web_search`, `web_news`, `fetch_page`, `web_research`), files, `run_python` sandbox, screen/webcam, memory. Dangerous tools are locked after touching untrusted web content in the same turn (`TAINT_LOCK`).
+* In Open WebUI, set **Task Model** (*Settings -> Admin -> Interface*) to a plain Ollama model such as `llama3.1:8b`, not `ia-agent`.
+
+See [docs/AGENT.md](docs/AGENT.md) for modes, security model (SSRF filter, command allowlist, workspace limits), endpoints and limitations.
+
+---
+
+## 6. Tests
+They need neither network nor Ollama.
+
+```bash
+.venv/bin/python -m pytest          # Windows: .venv\Scripts\python -m pytest
+```
+
+On Windows, the tests that need symlinks or `ls` are skipped automatically.
+
+---
+
+## 7. Models
+Defaults come from `.env` (`LLM_MODEL`, `VISION_MODEL`, `EMBED_MODEL`). `scripts/install.sh` pulls them:
+
+```bash
+ollama pull llama3.1:8b          # agent LLM (tool-calling); alternative: qwen2.5:7b
+ollama pull llava                # vision
+ollama pull nomic-embed-text     # memory embeddings
+```
+
+Mistral 7B is not suitable for reliable tool-calling. `instalar.sh` pulls `qwen2.5-coder:1.5b` and Gemma-3-1B for the basic stack.
+
+---
+
+## 8. Remote Access with Tailscale (Critical)
 Tailscale is the key piece for the project's security and portability. It creates a private virtual network (Mesh VPN) that allows accessing the server from anywhere without exposing the machine to the internet.
 
 ### Benefits of Tailscale
@@ -127,23 +182,8 @@ Tailscale is the key piece for the project's security and portability. It create
 
 ---
 
-## 5. Usage and Useful Commands
-
-### Model Management
-Models must be downloaded manually before first use:
-```bash
-ollama pull llama3       # Balanced model from Meta
-ollama pull mistral (not used in the repo)     # Optimized for efficiency
-ollama pull llava (not used in the repo)       # Multimodal model (supports images)
-```
-
-### Interface Maintenance
-* **View activity logs:** `docker logs -f open-webui`
-* **Update to the latest version:**
-  ```bash
-  docker compose pull
-  docker compose up -d
-  ```
-
-### Network Diagnostics
-To confirm remote access is working, verify that you can ping the Tailscale IP from an external device connected to the same Tailscale account.
+## 9. Useful commands
+* **Open WebUI logs:** `docker logs -f open-webui`
+* **Update images:** `docker compose pull && docker compose up -d`
+* **Agent health:** `curl http://127.0.0.1:8000/health`
+* **Diagnostics:** ping the Tailscale IP from another device on the same account.
