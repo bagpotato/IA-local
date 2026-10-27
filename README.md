@@ -2,11 +2,11 @@
 
 ![Skills](https://skillicons.dev/icons?i=docker,linux,bash,python,fastapi&theme=dark)
 
-Private, local AI environment: **Ollama** runs the models, **opencode** is the client, and a **local multimodal agent** (FastAPI, OpenAI-compatible API) adds web research, file tools, a Docker code sandbox, memory (Qdrant), screen/webcam vision and voice. Remote access goes through **Tailscale**, with no open ports on your router.
+Private, local AI environment: **Ollama** runs the models, **opencode** is the client, and a **local multimodal agent** (FastAPI, OpenAI-compatible API) adds web research, file tools, a Docker code sandbox, memory (embedded Qdrant), screen/webcam vision and voice. Remote access goes through **Tailscale**, with no open ports on your router.
 
 ```
 opencode (host) --> http://127.0.0.1:8000/v1 --> agent (host) --> Ollama (host)
-                                                              |- Qdrant (Docker, 127.0.0.1:6333)
+                                                              |- Qdrant (embedded, data/qdrant)
                                                               `- sandbox: docker run --rm --network none ...
 ```
 
@@ -16,7 +16,7 @@ Full agent documentation (modes, tools, security, endpoints): [docs/AGENT.md](do
 1. [Repository layout](#1-repository-layout)
 2. [Installing Docker](#2-installing-docker)
 3. [Installing Ollama](#3-installing-ollama)
-4. [Qdrant (Docker)](#4-qdrant-docker)
+4. [Memory (Qdrant embedded)](#4-memory-qdrant-embedded)
 5. [Local agent](#5-local-agent)
 6. [Tests](#6-tests)
 7. [Models](#7-models)
@@ -35,21 +35,20 @@ Full agent documentation (modes, tools, security, endpoints): [docs/AGENT.md](do
 
 | Path | Description |
 |---|---|
-| `docker-compose.yml` | Qdrant (agent memory), bound to `127.0.0.1:6333` |
 | `opencode.json` | opencode config: agent (`ia-local/ia-agent`) and Ollama as providers |
-| `instalar.sh` | Pulls the small models (`qwen2.5-coder:1.5b`, Gemma-3-1B) with the native Ollama |
-| `coder_shell.py` | Minimal CLI that queries `qwen2.5-coder:1.5b` on `localhost:11434` (needs `requests`) |
+| `instalar.sh` | Pulls the Ollama models you pass as arguments: `bash instalar.sh <model> ...` |
+| `coder_shell.py` | Minimal CLI that queries the model in `OLLAMA_MODEL` on `localhost:11434` (needs `requests`) |
 | `agent/` | The agent: engines (native / CrewAI), tools, security, storage and tests |
 | `scripts/install.sh`, `scripts/run.sh` | Install and run the agent (venv, models, sandbox image, Piper voice, `.env`) |
 | `.env.example` | Agent configuration template |
 | `docs/AGENT.md` | Detailed agent documentation (in Spanish) |
 
-Docker is only used for Qdrant and for the ephemeral `run_python` sandbox containers. Ollama runs natively on the host.
+Docker is only used for the ephemeral `run_python` sandbox containers. Ollama and Qdrant (embedded, stored in `data/qdrant`) run on the host without Docker.
 
 ---
 
 ## 2. Installing Docker
-Docker is essential to isolate the services and to simplify updating the web interface and other system components.
+Docker is only needed for the `run_python` code sandbox (optional: without it, set `ENABLE_CODE=false`).
 
 ### On Linux (Ubuntu/Debian)
 ```bash
@@ -104,21 +103,16 @@ The agent talks to Ollama on `127.0.0.1:11434`, so this is not needed. Only if o
 
 ---
 
-## 4. Qdrant (Docker)
-Agent memory uses Qdrant. Docker also runs the `run_python` sandbox, so it stays as a requirement.
-
-```bash
-docker compose up -d
-```
+## 4. Memory (Qdrant embedded)
+Agent memory uses Qdrant in embedded mode: no server and no Docker, data is stored in the folder set by `QDRANT_URL` (default `data/qdrant`). Only one agent process can open that folder at a time. To use a Qdrant server instead, set `QDRANT_URL=http://host:6333`.
 
 ---
 
 ## 5. Local agent
-The agent runs on the host (Python venv) next to Ollama and exposes an OpenAI-compatible API on `127.0.0.1:8000` that **opencode** consumes (model `ia-local/ia-agent`, see `opencode.json`).
+The agent runs on the host (Python venv) next to Ollama and exposes an OpenAI-compatible API on `127.0.0.1:8000` that **opencode** consumes (model `ia-local/ia-agent`, see `opencode.json`; add your Ollama models under `provider.ollama.models` to use them directly).
 
 ```bash
-bash scripts/install.sh      # venv, dependencies, Ollama models, sandbox image, Piper voice, .env
-docker compose up -d         # Qdrant
+bash scripts/install.sh      # venv, dependencies, asks which Ollama models to use, sandbox image, Piper voice, .env
 bash scripts/run.sh          # starts the agent on :8000
 export AGENT_API_KEY=$(grep ^AGENT_API_KEY= .env | cut -d= -f2-)
 opencode                     # https://opencode.ai
@@ -144,15 +138,15 @@ On Windows, the tests that need symlinks or `ls` are skipped automatically.
 ---
 
 ## 7. Models
-Defaults come from `.env` (`LLM_MODEL`, `VISION_MODEL`, `EMBED_MODEL`). `scripts/install.sh` pulls them:
+No model is preselected. `scripts/install.sh` asks which Ollama models to use and writes them to `.env` (offering `ollama pull` if they are missing):
 
-```bash
-ollama pull llama3.1:8b          # agent LLM (tool-calling); alternative: qwen2.5:7b
-ollama pull llava                # vision
-ollama pull nomic-embed-text     # memory embeddings
-```
+| Variable | Use | Required |
+|---|---|---|
+| `LLM_MODEL` | Agent LLM; it must support tool-calling | yes |
+| `VISION_MODEL` | Describe images and screen | no |
+| `EMBED_MODEL` | Memory embeddings | no |
 
-Mistral 7B is not suitable for reliable tool-calling. `instalar.sh` pulls `qwen2.5-coder:1.5b` and Gemma-3-1B for the basic stack.
+You can also edit them in `.env` at any time. The agent refuses to start if `LLM_MODEL` is empty. Not every model handles tool-calling reliably (Mistral 7B does not).
 
 ---
 
@@ -179,6 +173,5 @@ Tailscale is the key piece for the project's security and portability. It create
 ---
 
 ## 9. Useful commands
-* **Update Qdrant:** `docker compose pull && docker compose up -d`
 * **Agent health:** `curl http://127.0.0.1:8000/health`
 * **Diagnostics:** ping the Tailscale IP from another device on the same account.

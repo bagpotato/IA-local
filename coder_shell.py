@@ -1,10 +1,11 @@
+import os
 import requests
 import json
 
 def chat_ollama(prompt):
     url = "http://localhost:11434/api/generate"
     data = {
-        "model": "qwen2.5-coder:1.5b",
+        "model": os.environ["OLLAMA_MODEL"],
         "prompt": prompt,
         "stream": False
     }

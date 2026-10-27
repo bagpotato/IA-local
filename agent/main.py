@@ -396,6 +396,8 @@ def create_app(
 
 def main() -> None:
     settings = get_settings()
+    if not settings.llm_model:
+        raise SystemExit("Define LLM_MODEL en .env (ejecuta scripts/install.sh o elige un modelo de `ollama list`).")
     app = create_app(settings)
     uvicorn.run(app, host=settings.agent_host, port=settings.agent_port, log_level="warning")
 

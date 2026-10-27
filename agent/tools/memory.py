@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -31,7 +32,12 @@ def _client(settings: Settings):
     url = settings.qdrant_url
     with _lock:
         if url not in _clients:
-            _clients[url] = QdrantClient(location=":memory:") if url == ":memory:" else QdrantClient(url=url, timeout=10)
+            if url == ":memory:":
+                _clients[url] = QdrantClient(location=":memory:")
+            elif "://" in url:
+                _clients[url] = QdrantClient(url=url, timeout=10)
+            else:
+                _clients[url] = QdrantClient(path=str(Path(url).expanduser()))
         return _clients[url]
 
 

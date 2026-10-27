@@ -1,10 +1,10 @@
 # Agente local multimodal
 
-Agente que corre en el **host** (venv de Python) junto a Ollama y expone una API compatible con OpenAI para clientes como opencode. Docker se usa solo para Qdrant y los contenedores efímeros del sandbox de código.
+Agente que corre en el **host** (venv de Python) junto a Ollama y expone una API compatible con OpenAI para clientes como opencode. Docker se usa solo para los contenedores efímeros del sandbox de código; Qdrant corre embebido (carpeta `data/qdrant`), sin servidor.
 
 ```
 opencode (host) ──► http://127.0.0.1:8000/v1 ──► agente (host) ──► Ollama (host)
-                                                                   ├─► Qdrant (Docker, 127.0.0.1:6333)
+                                                                   ├─► Qdrant (embebido, data/qdrant)
                                                                    └─► sandbox: docker run --rm --network none …
 ```
 
@@ -13,8 +13,7 @@ opencode (host) ──► http://127.0.0.1:8000/v1 ──► agente (host) ─�
 Requisitos: Python 3.11+, Docker, Ollama funcionando en el host y [opencode](https://opencode.ai) como cliente.
 
 ```bash
-bash scripts/install.sh      # venv, dependencias, modelos de Ollama, imagen del sandbox, voz de Piper, .env
-docker compose up -d         # Qdrant (docker-compose.yml)
+bash scripts/install.sh      # venv, dependencias, elección de modelos de Ollama, imagen del sandbox, voz de Piper, .env
 bash scripts/run.sh          # arranca el agente en :8000
 ```
 
@@ -42,7 +41,7 @@ ENABLE_MEMORY=true
 ENABLE_SCREEN=true
 ```
 
-Requiere `docker compose up -d` (Qdrant) y la imagen `python:3.12-slim`.
+Requiere Docker y la imagen `python:3.12-slim` (sandbox); la memoria usa Qdrant embebido, sin servidor.
 
 **3. CrewAI** — mismas herramientas y mismo registro; un router decide qué roles (research, vision, executor) hacen falta.
 
@@ -54,7 +53,7 @@ AGENT_ENGINE=crewai
 .venv/bin/python -m pip install -r requirements-crewai.txt
 ```
 
-Modelo por defecto: `llama3.1:8b`. Alternativa: `qwen2.5` (`LLM_MODEL=qwen2.5:7b`). Mistral 7B no sirve para tool-calling fiable.
+Modelos: no hay ninguno por defecto. `install.sh` te pregunta `LLM_MODEL` (obligatorio, con tool-calling), `VISION_MODEL` y `EMBED_MODEL`, y los guarda en `.env`. Mistral 7B no sirve para tool-calling fiable.
 
 ## Herramientas
 
@@ -72,7 +71,7 @@ Límites: el workspace es `~/ia-workspace`; `run_command` solo admite `ls pwd ca
 
 ## Conexión con opencode
 
-`opencode.json` (raíz del repo) registra el agente como proveedor OpenAI-compatible (`http://127.0.0.1:8000/v1`, clave desde la variable `AGENT_API_KEY`) y deja Ollama como proveedor directo. Con la clave exportada, abre opencode en la carpeta del repo y elige el modelo **ia-local/ia-agent**:
+`opencode.json` (raíz del repo) registra el agente como proveedor OpenAI-compatible (`http://127.0.0.1:8000/v1`, clave desde la variable `AGENT_API_KEY`) y deja Ollama como proveedor directo. Con la clave exportada, abre opencode en la carpeta del repo y elige el modelo **ia-local/ia-agent** (para usar tus modelos de Ollama directamente, añádelos en `provider.ollama.models` de `opencode.json`):
 
 ```bash
 export AGENT_API_KEY=$(grep ^AGENT_API_KEY= .env | cut -d= -f2-)

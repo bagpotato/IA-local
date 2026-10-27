@@ -54,15 +54,49 @@ workspace="$(env_get WORKSPACE_DIR '~/ia-workspace')"
 workspace="${workspace/#\~/$HOME}"
 mkdir -p "$workspace" data voices
 
-# modelos de Ollama
-if command -v ollama >/dev/null; then
-  for model in "$(env_get LLM_MODEL llama3.1:8b)" "$(env_get VISION_MODEL llava)" "$(env_get EMBED_MODEL nomic-embed-text)"; do
-    say "ollama pull $model"
-    ollama pull "$model" || warn "No se pudo descargar $model"
-  done
-else
-  warn "ollama no está instalado: descarga los modelos a mano"
-fi
+env_set() {
+  local tmp
+  tmp="$(mktemp)"
+  grep -v "^$1=" .env > "$tmp" || true
+  printf '%s=%s\n' "$1" "$2" >> "$tmp"
+  cat "$tmp" > .env
+  rm -f "$tmp"
+}
+
+# modelos de Ollama: los elige el usuario
+choose_model() {
+  local var="$1" label="$2" required="$3" current answer
+  current="$(env_get "$var" "")"
+  if [[ -n "$current" ]]; then
+    say "$var=$current (ya definido en .env)"
+  elif [[ -t 0 ]]; then
+    if command -v ollama >/dev/null; then
+      say "Modelos instalados en Ollama:"
+      ollama list 2>/dev/null | tail -n +2 | awk '{print "  - " $1}' || true
+    fi
+    read -r -p "[install] Modelo para $label ($var)$([[ $required == yes ]] || echo ' [Enter = omitir]'): " answer
+    while [[ -z "$answer" && $required == yes ]]; do
+      read -r -p "[install] $var es obligatorio: " answer
+    done
+    [[ -n "$answer" ]] && env_set "$var" "$answer"
+    current="$answer"
+  else
+    [[ $required == yes ]] && warn "$var vacío: defínelo en .env antes de arrancar"
+  fi
+  if [[ -n "$current" ]] && command -v ollama >/dev/null; then
+    if ollama list 2>/dev/null | awk 'NR>1{print $1}' | grep -qx "$current" || ollama list 2>/dev/null | awk 'NR>1{print $1}' | grep -qx "$current:latest"; then
+      say "$current ya está en Ollama"
+    else
+      read -r -p "[install] ¿Descargar $current con ollama pull? [S/n] " answer </dev/tty || answer=n
+      [[ "${answer:-S}" =~ ^[SsYy]$ ]] && { ollama pull "$current" || warn "No se pudo descargar $current"; }
+    fi
+  fi
+}
+
+choose_model LLM_MODEL "el LLM del agente (con tool-calling)" yes
+choose_model VISION_MODEL "visión (describir imágenes y pantalla)" no
+choose_model EMBED_MODEL "embeddings (memoria)" no
+command -v ollama >/dev/null || warn "ollama no está instalado: descarga los modelos a mano"
 
 # imagen del sandbox de código
 if command -v docker >/dev/null; then

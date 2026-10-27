@@ -25,10 +25,10 @@ class Settings(BaseSettings):
 
     # Ollama y modelos
     ollama_host: str = Field("http://127.0.0.1:11434", alias="OLLAMA_HOST")
-    llm_model: str = Field("llama3.1:8b", alias="LLM_MODEL")
-    vision_model: str = Field("llava", alias="VISION_MODEL")
+    llm_model: str = Field("", alias="LLM_MODEL")
+    vision_model: str = Field("", alias="VISION_MODEL")
     router_model: str = Field("", alias="ROUTER_MODEL")
-    embed_model: str = Field("nomic-embed-text", alias="EMBED_MODEL")
+    embed_model: str = Field("", alias="EMBED_MODEL")
     num_ctx: int = Field(8192, alias="NUM_CTX", ge=1024)
     max_iterations: int = Field(6, alias="MAX_ITERATIONS", ge=1, le=20)
     request_timeout: float = Field(300.0, alias="REQUEST_TIMEOUT", gt=0)
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     code_timeout: float = Field(20.0, alias="CODE_TIMEOUT", gt=0, le=120)
 
     # Memoria
-    qdrant_url: str = Field("http://127.0.0.1:6333", alias="QDRANT_URL")
+    qdrant_url: str = Field("data/qdrant", alias="QDRANT_URL")
 
     # Visión
     webcam_index: int = Field(0, alias="WEBCAM_INDEX", ge=0)

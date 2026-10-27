@@ -9,17 +9,18 @@
         "apiKey": "{env:AGENT_API_KEY}"
       },
       "models": {
-        "ia-agent": { "name": "ia-agent" }
+        "ia-agent": {
+          "name": "ia-agent"
+        }
       }
     },
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Ollama (directo)",
-      "options": { "baseURL": "http://127.0.0.1:11434/v1" },
-      "models": {
-        "qwen2.5-coder:1.5b": { "name": "qwen2.5-coder:1.5b" }
-      }
+      "options": {
+        "baseURL": "http://127.0.0.1:11434/v1"
+      },
+      "models": {}
     }
-  },
-  "model": "ia-local/ia-agent"
+  }
 }

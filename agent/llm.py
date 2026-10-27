@@ -41,7 +41,7 @@ def _raise_for_body(status: int, body: str, model: str) -> None:
     if status == 400 and "support" in low and "tool" in low:
         raise ToolsNotSupported(
             f"El modelo '{model}' no soporta herramientas (tool-calling). "
-            "Usa llama3.1:8b o qwen2.5 en LLM_MODEL."
+            "Elige en LLM_MODEL un modelo con soporte de tool-calling."
         )
     raise OllamaError(f"Ollama respondió {status}: {msg[:300]}")
 
