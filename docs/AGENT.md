@@ -1,20 +1,20 @@
 # Agente local multimodal
 
-Agente que corre en el **host** (venv de Python) junto a Ollama y expone una API compatible con OpenAI para Open WebUI. Docker se usa solo para Open WebUI, Qdrant y los contenedores efímeros del sandbox de código.
+Agente que corre en el **host** (venv de Python) junto a Ollama y expone una API compatible con OpenAI para clientes como opencode. Docker se usa solo para Qdrant y los contenedores efímeros del sandbox de código.
 
 ```
-Open WebUI (Docker) ──► http://host.docker.internal:8000/v1 ──► agente (host) ──► Ollama (host)
+opencode (host) ──► http://127.0.0.1:8000/v1 ──► agente (host) ──► Ollama (host)
                                                                    ├─► Qdrant (Docker, 127.0.0.1:6333)
                                                                    └─► sandbox: docker run --rm --network none …
 ```
 
 ## Instalación
 
-Requisitos: Python 3.11+, Docker, Ollama funcionando en el host.
+Requisitos: Python 3.11+, Docker, Ollama funcionando en el host y [opencode](https://opencode.ai) como cliente.
 
 ```bash
 bash scripts/install.sh      # venv, dependencias, modelos de Ollama, imagen del sandbox, voz de Piper, .env
-docker compose up -d         # Open WebUI + Qdrant (lee docker-compose.yml y docker-compose.override.yml)
+docker compose up -d         # Qdrant (docker-compose.yml)
 bash scripts/run.sh          # arranca el agente en :8000
 ```
 
@@ -70,19 +70,20 @@ Modelo por defecto: `llama3.1:8b`. Alternativa: `qwen2.5` (`LLM_MODEL=qwen2.5:7b
 
 Límites: el workspace es `~/ia-workspace`; `run_command` solo admite `ls pwd cat head tail wc grep uniq date df du uname stat file`, sin shell ni rutas fuera del workspace; `run_python` usa un contenedor sin red, de solo lectura y sin montajes.
 
-## Conexión con Open WebUI
+## Conexión con opencode
 
-`docker-compose.override.yml` ya apunta Open WebUI al agente (`OPENAI_API_BASE_URL`, clave, STT y TTS tipo OpenAI). Tras `docker compose up -d` aparece el modelo **ia-agent**.
+`opencode.json` (raíz del repo) registra el agente como proveedor OpenAI-compatible (`http://127.0.0.1:8000/v1`, clave desde la variable `AGENT_API_KEY`) y deja Ollama como proveedor directo. Con la clave exportada, abre opencode en la carpeta del repo y elige el modelo **ia-local/ia-agent**:
 
-**Task model (importante).** Open WebUI envía los títulos de chat, las etiquetas y las sugerencias al mismo modelo que estés usando, y no deben disparar búsquedas web. En *Ajustes → Admin → Interfaz* pon como **Task Model** (local) un modelo normal de Ollama, por ejemplo `llama3.1:8b`, no `ia-agent`.
+```bash
+export AGENT_API_KEY=$(grep ^AGENT_API_KEY= .env | cut -d= -f2-)
+opencode
+```
 
 Los estados de herramienta aparecen como líneas en cursiva dentro de la respuesta.
 
 ## Red, firewall y Tailscale
 
-- El agente escucha en `0.0.0.0:8000` para que Docker lo alcance. No abras el 8000 a la LAN sin necesidad: limita el acceso al puente de Docker y a Tailscale, y deja que los dispositivos remotos entren por Open WebUI (puerto 3000 por Tailscale).
-- Ejemplo con ufw: `sudo ufw deny 8000/tcp` y `sudo ufw allow in on docker0 to any port 8000 proto tcp` (ajusta el nombre de la interfaz a tu sistema).
-- Si no necesitas que Docker llegue por la interfaz externa, `AGENT_HOST=172.17.0.1` (IP de `docker0`) reduce la exposición.
+- El agente escucha por defecto en `127.0.0.1:8000` (`AGENT_HOST`). Para usarlo desde otros dispositivos, pon `AGENT_HOST` con la IP de Tailscale (`tailscale ip -4`) y no abras el 8000 a la LAN.
 - Toda la API exige `AGENT_API_KEY` (cabecera `Authorization: Bearer …` o `X-API-Key`); solo `/health` es público. Sin clave, el servidor no arranca.
 
 ## Acceso a internet

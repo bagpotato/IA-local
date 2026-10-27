@@ -2,12 +2,12 @@
 
 ![Skills](https://skillicons.dev/icons?i=docker,linux,bash,python,fastapi&theme=dark)
 
-Private, local AI environment: **Ollama** runs the models, **Open WebUI** is the chat interface, and a **local multimodal agent** (FastAPI, OpenAI-compatible API) adds web research, file tools, a Docker code sandbox, memory (Qdrant), screen/webcam vision and voice. Remote access goes through **Tailscale**, with no open ports on your router.
+Private, local AI environment: **Ollama** runs the models, **opencode** is the client, and a **local multimodal agent** (FastAPI, OpenAI-compatible API) adds web research, file tools, a Docker code sandbox, memory (Qdrant), screen/webcam vision and voice. Remote access goes through **Tailscale**, with no open ports on your router.
 
 ```
-Open WebUI (Docker) --> http://host.docker.internal:8000/v1 --> agent (host) --> Ollama
-                                                                  |- Qdrant (Docker, 127.0.0.1:6333)
-                                                                  `- sandbox: docker run --rm --network none ...
+opencode (host) --> http://127.0.0.1:8000/v1 --> agent (host) --> Ollama (host)
+                                                              |- Qdrant (Docker, 127.0.0.1:6333)
+                                                              `- sandbox: docker run --rm --network none ...
 ```
 
 Full agent documentation (modes, tools, security, endpoints): [docs/AGENT.md](docs/AGENT.md)
@@ -16,7 +16,7 @@ Full agent documentation (modes, tools, security, endpoints): [docs/AGENT.md](do
 1. [Repository layout](#1-repository-layout)
 2. [Installing Docker](#2-installing-docker)
 3. [Installing Ollama](#3-installing-ollama)
-4. [Basic stack: Ollama + Open WebUI](#4-basic-stack-ollama--open-webui)
+4. [Qdrant (Docker)](#4-qdrant-docker)
 5. [Local agent](#5-local-agent)
 6. [Tests](#6-tests)
 7. [Models](#7-models)
@@ -35,16 +35,16 @@ Full agent documentation (modes, tools, security, endpoints): [docs/AGENT.md](do
 
 | Path | Description |
 |---|---|
-| `docker-compose.yml` | Basic stack: Ollama + Open WebUI (data in `ollama_data/` and `webui_data/`) |
-| `docker-compose.override.yml` | Points Open WebUI at the agent and adds Qdrant. Requires `AGENT_API_KEY` in `.env` |
-| `instalar.sh` | Starts the basic stack and pulls the small models (`qwen2.5-coder:1.5b`, Gemma-3-1B) into the Ollama container |
+| `docker-compose.yml` | Qdrant (agent memory), bound to `127.0.0.1:6333` |
+| `opencode.json` | opencode config: agent (`ia-local/ia-agent`) and Ollama as providers |
+| `instalar.sh` | Pulls the small models (`qwen2.5-coder:1.5b`, Gemma-3-1B) with the native Ollama |
 | `coder_shell.py` | Minimal CLI that queries `qwen2.5-coder:1.5b` on `localhost:11434` (needs `requests`) |
 | `agent/` | The agent: engines (native / CrewAI), tools, security, storage and tests |
 | `scripts/install.sh`, `scripts/run.sh` | Install and run the agent (venv, models, sandbox image, Piper voice, `.env`) |
 | `.env.example` | Agent configuration template |
 | `docs/AGENT.md` | Detailed agent documentation (in Spanish) |
 
-> `docker-compose.override.yml` is loaded automatically by `docker compose up -d`. Without `AGENT_API_KEY` defined in `.env`, the command fails. Run `bash scripts/install.sh` first (it generates the key), or run only the basic stack with `docker compose -f docker-compose.yml up -d`.
+Docker is only used for Qdrant and for the ephemeral `run_python` sandbox containers. Ollama runs natively on the host.
 
 ---
 
@@ -86,8 +86,8 @@ Ollama is the engine that runs large language models (LLMs) efficiently on the l
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-### Network Configuration for Ollama
-For Ollama to accept external connections (required for the Docker web interface and remote access), edit the service:
+### Network Configuration for Ollama (optional)
+The agent talks to Ollama on `127.0.0.1:11434`, so this is not needed. Only if other machines must reach Ollama directly, edit the service:
 
 1. Run: `sudo systemctl edit ollama.service`
 2. Insert the following content:
@@ -104,33 +104,29 @@ For Ollama to accept external connections (required for the Docker web interface
 
 ---
 
-## 4. Basic stack: Ollama + Open WebUI
-`docker-compose.yml` starts Ollama and **Open WebUI** (100% local, similar to commercial chat UIs):
+## 4. Qdrant (Docker)
+Agent memory uses Qdrant. Docker also runs the `run_python` sandbox, so it stays as a requirement.
 
 ```bash
-docker compose -f docker-compose.yml up -d
-bash instalar.sh        # optional: pulls the small models
+docker compose up -d
 ```
-
-Open WebUI is served on `http://localhost:3000`. Update it with `docker compose pull && docker compose up -d`.
-
-> The Ollama container publishes `11434` on all interfaces. Limit it with your firewall or bind it to `127.0.0.1:11434:11434` if you do not need LAN access.
 
 ---
 
 ## 5. Local agent
-The agent runs on the host (Python venv) next to Ollama and exposes an OpenAI-compatible API on port `8000` that Open WebUI consumes (model **ia-agent**).
+The agent runs on the host (Python venv) next to Ollama and exposes an OpenAI-compatible API on `127.0.0.1:8000` that **opencode** consumes (model `ia-local/ia-agent`, see `opencode.json`).
 
 ```bash
 bash scripts/install.sh      # venv, dependencies, Ollama models, sandbox image, Piper voice, .env
-docker compose up -d         # Open WebUI + Qdrant (reads docker-compose.yml and the override)
+docker compose up -d         # Qdrant
 bash scripts/run.sh          # starts the agent on :8000
+export AGENT_API_KEY=$(grep ^AGENT_API_KEY= .env | cut -d= -f2-)
+opencode                     # https://opencode.ai
 ```
 
 * `install.sh` creates `.env` with a random `AGENT_API_KEY` and does not print it. The whole API requires it except `/health`.
 * Engines: `AGENT_ENGINE=native` (default) or `crewai` (`pip install -r requirements-crewai.txt`).
 * Tools: web (`web_search`, `web_news`, `fetch_page`, `web_research`), files, `run_python` sandbox, screen/webcam, memory. Dangerous tools are locked after touching untrusted web content in the same turn (`TAINT_LOCK`).
-* In Open WebUI, set **Task Model** (*Settings -> Admin -> Interface*) to a plain Ollama model such as `llama3.1:8b`, not `ia-agent`.
 
 See [docs/AGENT.md](docs/AGENT.md) for modes, security model (SSRF filter, command allowlist, workspace limits), endpoints and limitations.
 
@@ -178,12 +174,11 @@ Tailscale is the key piece for the project's security and portability. It create
    Run `tailscale ip -4`. Use this address to connect from other devices.
 3. **Remote access:**
    Install Tailscale on your mobile device or laptop. Once active, you can access the web interface via:
-   `http://[TAILSCALE-IP]:3000`
+   `http://[TAILSCALE-IP]:8000` (set `AGENT_HOST` to the Tailscale IP and point opencode's `baseURL` at it)
 
 ---
 
 ## 9. Useful commands
-* **Open WebUI logs:** `docker logs -f open-webui`
-* **Update images:** `docker compose pull && docker compose up -d`
+* **Update Qdrant:** `docker compose pull && docker compose up -d`
 * **Agent health:** `curl http://127.0.0.1:8000/health`
 * **Diagnostics:** ping the Tailscale IP from another device on the same account.
