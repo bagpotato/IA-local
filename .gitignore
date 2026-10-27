@@ -5,3 +5,7 @@ webui_data/
 .env
 __pycache__/
 *.pyc
+data/
+voices/
+.venv/
+.pytest_cache/
