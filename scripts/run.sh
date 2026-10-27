@@ -5,11 +5,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 if [[ ! -x .venv/bin/python ]]; then
-  echo "No hay entorno virtual. Ejecuta primero: bash scripts/install.sh" >&2
+  echo "No virtual environment. Run first: bash scripts/install.sh" >&2
   exit 1
 fi
 if [[ ! -f .env ]]; then
-  echo "Falta .env. Ejecuta primero: bash scripts/install.sh" >&2
+  echo ".env is missing. Run first: bash scripts/install.sh" >&2
   exit 1
 fi
 
