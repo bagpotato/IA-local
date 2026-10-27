@@ -36,8 +36,6 @@ Full agent documentation (modes, tools, security, endpoints): [docs/AGENT.md](do
 | Path | Description |
 |---|---|
 | `opencode.json` | opencode config: agent (`ia-local/ia-agent`) and Ollama as providers |
-| `instalar.sh` | Pulls the Ollama models you pass as arguments: `bash instalar.sh <model> ...` |
-| `coder_shell.py` | Minimal CLI that queries the model in `OLLAMA_MODEL` on `localhost:11434` (needs `requests`) |
 | `agent/` | The agent: engines (native / CrewAI), tools, security, storage and tests |
 | `scripts/install.sh`, `scripts/run.sh` | Install and run the agent (venv, models, sandbox image, Piper voice, `.env`) |
 | `.env.example` | Agent configuration template |
